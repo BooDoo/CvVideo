@@ -487,7 +487,7 @@ class CvVideo(object):
     
     return False
   
-  def until_template(self, interval=0.5, templates=None, threshold=0.84, method=cv2.TM_CCOEFF_NORMED, frame_skip=None, use_roi=False, roi_rect=None, max_length=None):
+  def template_until(self, interval=0.5, templates=None, threshold=0.84, method=cv2.TM_CCOEFF_NORMED, frame_skip=None, use_roi=False, roi_rect=None, max_length=None):
     """Scrub through video until a template is found"""
     frame_skip = frame_skip if frame_skip else interval*self.fps
     max_length = max_length if max_length else self.duration
@@ -503,7 +503,7 @@ class CvVideo(object):
     else:
       return True
 
-  def while_template(self, interval=0.5, templates=None, threshold=0.84, method=cv2.TM_CCOEFF_NORMED, frame_skip=None, use_roi=False, roi_rect=None, max_length=None):
+  def template_while(self, interval=0.5, templates=None, threshold=0.84, method=cv2.TM_CCOEFF_NORMED, frame_skip=None, use_roi=False, roi_rect=None, max_length=None):
     """Scrub through video until no template is matched"""
     frame_skip = frame_skip if frame_skip else interval*self.fps
     max_length = max_length if max_length else self.duration
