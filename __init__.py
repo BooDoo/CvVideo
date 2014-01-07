@@ -4,18 +4,12 @@ from fractions import Fraction
 
 class CvVideo(object):
   #Constructor for the CvVideo object (requires OpenCV2 with ffmpeg support)
-  def __init__(self, input_file, gif_path='gifs', temp_path='tmp', splitter='___', scale_width=0.6, scale_height=0.45):
+  def __init__(self, input_file, gif_path='gifs', temp_path='tmp', splitter='___', crop_factor=None, crop_width=None, crop_height=None, from_youtube=None):
+    '''
+    crop_factor as float applies against both width and height, otherwise pass tuple (w_factor, h_factor)
+    '''
     self.input_file = input_file
     self.input_file_tail = os.path.split(input_file)[1]
-    try:
-      self.uploader, self.vid_id = os.path.splitext(self.input_file_tail)[0].split(splitter)[0:2]
-    except ValueError as e:
-      self.uploader, self.vid_id = 'Unknown', os.path.splitext(self.input_file_tail)[0]
-      
-    self.vid_link = "http://youtube.com/watch?v=" + self.vid_id
-    self.out_gif = os.path.join(gif_path, self.vid_id + '.gif')
-    self.temp_vid = os.path.join(temp_path, self.vid_id + '.avi')
-    self.out_mp4 = os.path.join(temp_path, self.vid_id + '.mp4')
 
     self.stream = stream = cv2.VideoCapture(input_file)
     self.framecount = stream.get(cv2.cv.CV_CAP_PROP_FRAME_COUNT)
@@ -24,20 +18,47 @@ class CvVideo(object):
     self.width = stream.get(cv2.cv.CV_CAP_PROP_FRAME_WIDTH)
     self.height = stream.get(cv2.cv.CV_CAP_PROP_FRAME_HEIGHT)   
     self.fourcc = stream.get(cv2.cv.CV_CAP_PROP_FOURCC)
-    self.tumblr_tags = ["spelunky","daily challenge","death","gif","book of the dead",self.uploader.replace("_","")]
+
+    if from_youtube:
+      try:
+        self.uploader, self.vid_id = os.path.splitext(self.input_file_tail)[0].split(splitter)[0:2]
+      except ValueError as e:
+        self.uploader, self.vid_id = 'Unknown', os.path.splitext(self.input_file_tail)[0]
+      self.vid_link = "http://youtube.com/watch?v=" + self.vid_id
+
+    self.aspect_ratio = Fraction(int(self.width),int(self.height)).limit_denominator(10)
+    self.template_scale = round(self.width/640.0*100)/100
     self.img = None
     self.gray = None
     self.template_found = None
-    self.death_frame = None
-    self.gif_start = None
+    self.templates = None
 
-    self.crop_width, self.crop_height = [int(self.width*scale_width), int(self.height*scale_height)]
-    self.output = cv2.VideoWriter(self.temp_vid,0,7,(self.crop_width,self.crop_height))
+    try:
+      out_base = self.vid_id
+    except NameError:
+      out_base = self.input_file_tail
+    self.out_gif = os.path.join(gif_path, out_base + '.gif')
+    self.out_avi = os.path.join(temp_path, out_base + '.avi')
+    self.out_mp4 = os.path.join(temp_path, out_base + '.mp4')
+
+    if crop_factor:
+      if type(crop_factor) == float:
+        self.crop_width, self.crop_height = (int(min(self.width*crop_factor, self.width)), int(min(self.height*crop_factor, self.height)) )
+      else:
+        self.crop_width, self.crop_height = (int(self.width*crop_factor[0]), int(self.height*crop_factor[1]))
+    elif crop_width or crop_height:
+      self.crop_width, self.crop_height = (int(min(crop_width or sys.maxint, self.width)), int(min(crop_height or sys.maxint, self.height)) )
+
+    self.output = cv2.VideoWriter(self.out_avi,0,7,(self.crop_width,self.crop_height))
+    self.roi_ratio = Fraction(int(self.crop_width),int(self.crop_height)).limit_denominator(10)
     self.roi_reset()
 
-    self.aspect_ratio = Fraction(int(self.width),int(self.height)).limit_denominator(10)
-    self.template_scale = round(self.width/640.0*100)/100 #self.width / 640.0
-    self.templates = None
+  def __getitem__(self, key):
+    return getattr(self, key)
+
+  def __setitem__(self, key, value):
+    setattr(self, key, value)
+    return value
 
   @property
   def roi_default(self):
@@ -231,7 +252,7 @@ class CvVideo(object):
     self.read()
     
     #dump output frames
-    #cv2.imwrite('dump/'+ self.vid_id + str(int(frame)) + '.png', self.roi)
+    #cv2.imwrite('dump/'+ self.out_base + str(int(frame)) + '.png', self.roi)
 
     if use_roi and not color:
       self.output.write(self.get_roi(False, roi_rect) )
@@ -245,7 +266,7 @@ class CvVideo(object):
     return self #chainable
   
   def reset_output(self):
-    self.output = cv2.VideoWriter(self.temp_vid,0,7,(self.crop_width,self.crop_height))
+    self.output = cv2.VideoWriter(self.out_avi,0,7,(self.crop_width,self.crop_height))
     return self #chainable
 
   #interval is in seconds, can be negative.
@@ -350,8 +371,8 @@ class CvVideo(object):
 
     return self #chainable
 
-  def gif_from_temp_vid(self, out_file=None, color=False, brightness=100, saturation=100, hue=100, delay=10, fuzz="4%", layers="OptimizeTransparency", flush_map=True):
-    """Call ImageMagick's `convert` from shell to create a GIF of video file found at `temp_vid`"""
+  def gif_from_out_avi(self, out_file=None, color=False, brightness=100, saturation=100, hue=100, delay=10, fuzz="4%", layers="OptimizeTransparency", flush_map=True):
+    """Call ImageMagick's `convert` from shell to create a GIF of video file found at `out_avi`"""
     #clear tmp folder:
     #subprocess.call(['sudo', 'rm', '-r', '/tmp'])
 
@@ -365,7 +386,7 @@ class CvVideo(object):
     bsh = map(str, [brightness, saturation, hue])
     
     try:
-      if os.path.getsize(self.temp_vid) < 6000:
+      if os.path.getsize(self.out_avi) < 6000:
         raise cv2.error("Didn't write any frames to AVI. Wrong crop-size? Wrong codec?")
     except os.error as e:
       raise cv2.error("Temp AVI doesn't exist!")
@@ -377,7 +398,7 @@ class CvVideo(object):
     if delay > 0:
       command.extend(['-delay', str(delay)])
 
-    command.append(self.temp_vid)
+    command.append(self.out_avi)
 
     if not all([v == '100' for v in bsh]):
       command.extend(['-modulate', ",".join(bsh)])
@@ -395,10 +416,10 @@ class CvVideo(object):
     sys.stdout.flush()
     return self #chainable
 
-  def clear_temp_vid(self):
-    """Delete the file at location `temp_vid`"""
+  def clear_out_avi(self):
+    """Delete the file at location `out_avi`"""
     try:
-      os.remove(self.temp_vid)
+      os.remove(self.out_avi)
     except IOError as e:
       print e
 
@@ -419,13 +440,13 @@ class CvVideo(object):
     target = self.get_roi(False, roi_rect) if use_roi else self.gray
     
     #dump checked frames
-    #cv2.imwrite('dump/'+ self.vid_id + '/' + str(int(self.frame)) + '.png', target)
+    #cv2.imwrite('dump/'+ self.out_base + '/' + str(int(self.frame)) + '.png', target)
     
     for label,template in templates:
       res = cv2.matchTemplate(target, template, method)
       min_val, max_val, min_loc, max_loc = cv2.minMaxLoc(res)
       if max_val >= threshold:
-        #cv2.imwrite('dump/'+ self.vid_id + '/' + str(int(self.frame)) + '-found.png', target)
+        #cv2.imwrite('dump/'+ self.out_base + '/' + str(int(self.frame)) + '-found.png', target)
         self.template_found = label
         #print "max_val for %s was %f" % (label, max_val)
         return True
@@ -446,7 +467,7 @@ class CvVideo(object):
     target = self.get_roi(False, roi_rect) if use_roi else self.gray
     
     #dump checked frames
-    #cv2.imwrite('dump/'+ self.vid_id + '/' + str(int(self.frame)) + '.png', target)
+    #cv2.imwrite('dump/'+ self.out_base + '/' + str(int(self.frame)) + '.png', target)
     
     matches = {} #dict((label,None) for label,template in templates)
     
