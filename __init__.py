@@ -4,7 +4,7 @@ from fractions import Fraction
 
 class CvVideo(object):
   #Constructor for the CvVideo object (requires OpenCV2 with ffmpeg support)
-  def __init__(self, input_file, gif_path='gifs', temp_path='tmp', splitter='___', crop_factor=None, crop_width=None, crop_height=None, from_youtube=None):
+  def __init__(self, input_file, gif_path='gifs', temp_path='tmp', splitter='___', crop_factor=None, crop_width=None, crop_height=None, from_youtube=None, avi_codec=None, avi_fps=None):
     '''
     crop_factor as float applies against both width and height, otherwise pass tuple (w_factor, h_factor)
     '''
@@ -49,7 +49,9 @@ class CvVideo(object):
     elif crop_width or crop_height:
       self.crop_width, self.crop_height = (int(min(crop_width or sys.maxint, self.width)), int(min(crop_height or sys.maxint, self.height)) )
 
-    self.output = cv2.VideoWriter(self.out_avi,0,7,(self.crop_width,self.crop_height))
+    self.avi_codec = avi_codec or 0
+    self.avi_fps = avi_fps or self.fps
+    self.output = cv2.VideoWriter(self.out_avi, self.avi_codec, self.avi_fps, (self.crop_width,self.crop_height))
     self.roi_ratio = Fraction(int(self.crop_width),int(self.crop_height)).limit_denominator(10)
     self.roi_reset()
 
@@ -265,8 +267,10 @@ class CvVideo(object):
   
     return self #chainable
   
-  def reset_output(self):
-    self.output = cv2.VideoWriter(self.out_avi,0,7,(self.crop_width,self.crop_height))
+  def reset_output(self, codec=None, fps=None):
+    codec = codec or self.avi_codec or 0
+    fps = fps or self.avi_fps or self.fps
+    self.output = cv2.VideoWriter(self.out_avi, codec, fps, (self.crop_width,self.crop_height))
     return self #chainable
 
   #interval is in seconds, can be negative.
@@ -346,7 +350,6 @@ class CvVideo(object):
 
     if transpose:
       filters.append("transpose="+str(transpose))
-
 
     sys.stdout.write("\nMaking MP4 at:"+out_file+"...")
     sys.stdout.flush()
