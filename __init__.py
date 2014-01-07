@@ -48,6 +48,8 @@ class CvVideo(object):
         self.crop_width, self.crop_height = (int(self.width*crop_factor[0]), int(self.height*crop_factor[1]))
     elif crop_width or crop_height:
       self.crop_width, self.crop_height = (int(min(crop_width or sys.maxint, self.width)), int(min(crop_height or sys.maxint, self.height)) )
+    else:
+      self.crop_width, self.crop_height = ( int(self.width), int(self.height) )
 
     self.avi_codec = avi_codec or 0
     self.avi_fps = avi_fps or self.fps
