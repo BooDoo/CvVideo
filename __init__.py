@@ -28,15 +28,20 @@ class CvVideo(object):
 
         if from_youtube:
             try:
-                self.uploader, self.vid_id =
-                os.path.splitext(self.input_file_tail)[0].split(splitter)[0:2]
+                self.uploader, self.vid_id = (
+                    os.path.splitext(self.input_file_tail)[0]
+                    .split(splitter)[0:2]
+                )
             except ValueError as e:
-                self.uploader, self.vid_id =
-                'Unknown', os.path.splitext(self.input_file_tail)[0]
+                self.uploader, self.vid_id = (
+                    'Unknown',
+                    os.path.splitext(self.input_file_tail)[0]
+                )
             self.vid_link = "http://youtube.com/watch?v=" + self.vid_id
 
-        self.aspect_ratio = Fraction(int(self.width), int(self.height))
-        .limit_denominator(10)
+        self.aspect_ratio = (
+            Fraction(int(self.width), int(self.height)).limit_denominator(10)
+        )
         self.template_scale = round(self.width/640.0*100)/100
         self.img = None
         self.gray = None
@@ -53,29 +58,35 @@ class CvVideo(object):
 
         if crop_factor:
             if type(crop_factor) == float:
-                self.crop_width, self.crop_height =
-                (int(min(self.width*crop_factor, self.width)),
-                 int(min(self.height*crop_factor, self.height)))
+                self.crop_width, self.crop_height = (
+                    int(min(self.width*crop_factor, self.width)),
+                    int(min(self.height*crop_factor, self.height))
+                )
             else:
-                self.crop_width, self.crop_height =
-                (int(self.width*crop_factor[0]),
-                 int(self.height*crop_factor[1]))
+                self.crop_width, self.crop_height = (
+                    int(self.width*crop_factor[0]),
+                    int(self.height*crop_factor[1])
+                )
         elif crop_width or crop_height:
-            self.crop_width, self.crop_height =
-            (int(min(crop_width or sys.maxint, self.width)),
-             int(min(crop_height or sys.maxint, self.height)))
+            self.crop_width, self.crop_height = (
+                int(min(crop_width or sys.maxint, self.width)),
+                int(min(crop_height or sys.maxint, self.height))
+            )
         else:
-            self.crop_width, self.crop_height =
-            (int(self.width),
-             int(self.height))
+            self.crop_width, self.crop_height = (
+                int(self.width),
+                int(self.height)
+            )
 
         self.avi_codec = avi_codec or 0
         self.avi_fps = avi_fps or self.fps
-        self.output =
-        cv2.VideoWriter(self.out_avi, self.avi_codec, self.avi_fps,
-                        (self.crop_width, self.crop_height))
-        self.roi_ratio = Fraction(int(self.crop_width), int(self.crop_height))
-        .limit_denominator(10)
+        self.output = cv2.VideoWriter(self.out_avi,
+                                      self.avi_codec, self.avi_fps,
+                                      (self.crop_width, self.crop_height))
+        self.roi_ratio = (
+            Fraction(int(self.crop_width), int(self.crop_height))
+            .limit_denominator(10)
+        )
         self.roi_reset()
 
     def __getitem__(self, key):
@@ -88,13 +99,15 @@ class CvVideo(object):
     @property
     def roi_default(self):
         """return our default crop ROI"""
-        self._minY, self._minX =
-        [int((self.height - self.crop_height) / 2),
-         int((self.width - self.crop_width) / 2)]
+        self._minY, self._minX = [
+            int((self.height - self.crop_height) / 2),
+            int((self.width - self.crop_width) / 2)
+        ]
 
-        self._maxY, self._maxX =
-        [self._minY + self.crop_height,
-         self._minX + self.crop_width]
+        self._maxY, self._maxX = [
+            self._minY + self.crop_height,
+            self._minX + self.crop_width
+        ]
 
         return (self._minX, self._minY, self._maxX, self._maxY)
 
@@ -315,9 +328,8 @@ class CvVideo(object):
     def reset_output(self, codec=None, fps=None):
         codec = codec or self.avi_codec or 0
         fps = fps or self.avi_fps or self.fps
-        self.output =
-        cv2.VideoWriter(self.out_avi, codec,
-                        fps, (self.crop_width, self.crop_height))
+        self.output = cv2.VideoWriter(self.out_avi, codec, fps,
+                                      (self.crop_width, self.crop_height))
         return self
 
     #interval is in seconds, can be negative.
@@ -400,9 +412,10 @@ class CvVideo(object):
         if crop:
             filters.append("crop=%s" % crop)
         elif use_roi:
-            crop_w, crop_h, crop_x, crop_y =
-            (roi_rect[2] - roi_rect[0], roi_rect[3] - roi_rect[1],
-             roi_rect[0], roi_rect[1])
+            crop_w, crop_h, crop_x, crop_y = (
+                roi_rect[2] - roi_rect[0], roi_rect[3] - roi_rect[1],
+                roi_rect[0], roi_rect[1]
+            )
             filters.append("crop=%s:%s:%s:%s"
                            % (crop_w, crop_h, crop_x, crop_y))
 
@@ -567,9 +580,8 @@ class CvVideo(object):
                 matches[label] = max_val
 
         if matches:
-            match_best =
-            [label for label in
-             sorted(matches, key=matches.get, reverse=True)][0]
+            match_best = [label for label in
+                          sorted(matches, key=matches.get, reverse=True)][0]
             self.template_found = match_best
             return match_best
 
