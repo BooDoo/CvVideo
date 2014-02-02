@@ -2,8 +2,8 @@ import os
 import sys
 import subprocess
 import cv2
+import logging
 from fractions import Fraction
-
 
 class CvVideo(object):
     #Constructor for the CvVideo object (requires OpenCV2 with ffmpeg support)
@@ -15,6 +15,7 @@ class CvVideo(object):
         Crop_factor as float applies against both width and height
         Otherwise pass tuple (w_factor, h_factor)
         '''
+        self._logger = None
         self.input_file = input_file
         self.input_file_tail = os.path.split(input_file)[1]
 
@@ -111,6 +112,41 @@ class CvVideo(object):
 
         return (self._minX, self._minY, self._maxX, self._maxY)
 
+    def exception(self, message, e):
+        if self._logger:
+            self._logger.exception(message)
+        else:
+            sys.stderr.write('[EXCEPT]:  ' + message + "\n" + repr(e))
+            sys.stderr.flush()
+
+    def error(self, message):
+        if self._logger:
+            self._logger.error(message)
+        else:
+            sys.stderr.write('[ERROR]:  ' + message + "\n")
+            sys.stderr.flush()
+
+    def warn(self, message):
+        if self._logger:
+            self._logger.warn(message)
+        else:
+            sys.stdout.write('[WARN]:   ' + message + "\n")
+            sys.stdout.flush()
+
+    def log(self, message, level=20):
+        if self._logger:
+            self._logger.log(level, message)
+        else:
+            sys.stdout.write('[INFO]:   ' + message + "\n")
+            sys.stdout.flush()
+
+    def debug(self, message):
+        if self._logger:
+            self._logger.debug(message)
+        else:
+            sys.stdout.write('[DEBUG]:  ' + message + "\n")
+            sys.stdout.flush()
+
     @property
     def frame(self):
         """A pass-through to VideoCapture.POS_FRAMES"""
@@ -118,7 +154,7 @@ class CvVideo(object):
 
     @frame.setter
     def frame(self, frame):
-        #print "Setting 'frame' to",frame,"out of",self.framecount
+        #self.debug("Setting 'frame' to %s out of %s" % (frame, self.framecount))
         if frame < 0 or frame > self.framecount:
             raise cv2.error("Requested frame is out of bounds")
         else:
@@ -230,7 +266,7 @@ class CvVideo(object):
 
     def _skip(self, frames=1):
         """Generic function for scrubbing back/forward by `frames`"""
-        #print "Starting at",self.frame,"skipping",frames,"frames"
+        #self.debug("Starting at %s skipping %s frames" % (self.frame, frames))
         self.frame += frames
         sys.stdout.write("+" if frames > 0 else "-")
         sys.stdout.flush()
@@ -429,8 +465,7 @@ class CvVideo(object):
         if transpose:
             filters.append("transpose="+str(transpose))
 
-        sys.stdout.write("\nMaking MP4 at:"+out_file+"...")
-        sys.stdout.flush()
+        self.debug("Writing to " + out_file + "...")
 
         command = ['ffmpeg', '-y']
         command.extend(['-ss', str(from_frame / self.fps)])
@@ -447,8 +482,7 @@ class CvVideo(object):
         command.append(out_file)
         subprocess.call(command)
 
-        sys.stdout.write("done!\n")
-        sys.stdout.flush()
+        self.log("Wrote to " + out_file)
 
         return self
 
@@ -479,8 +513,7 @@ class CvVideo(object):
         except os.error as e:
             raise cv2.error("Temp AVI doesn't exist!")
 
-        sys.stdout.write("\nWriting to " + out_file + "...")
-        sys.stdout.flush()
+        self.debug("Writing to " + out_file + "...")
 
         command = ['convert']
         if delay > 0:
@@ -500,8 +533,7 @@ class CvVideo(object):
 
         subprocess.call(command)
 
-        sys.stdout.write("done!\n")
-        sys.stdout.flush()
+        self.log("Wrote to " + out_file)
         return self
 
     def clear_out_avi(self):
@@ -509,7 +541,7 @@ class CvVideo(object):
         try:
             os.remove(self.out_avi)
         except IOError as e:
-            print e
+            self.exception("Trouble clearing temp AVI:",e)
 
         return self
 
@@ -543,7 +575,7 @@ class CvVideo(object):
                 #cv2.imwrite('dump/'+ self.out_base + '/' +
                 #             str(int(self.frame)) + '-found.png', target)
                 self.template_found = label
-                #print "max_val for %s was %f" % (label, max_val)
+                #self.debug("max_val for %s was %f" % (label, max_val))
                 return True
 
         return False
